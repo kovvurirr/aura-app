@@ -400,7 +400,7 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
     try{
       const history=[...msgs,userMsg].map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
       const projectCtx=activeProj?`Current project: "${activeProj.name}" — ${activeProj.desc||""}. `:"";
-      const res=await fetch("https://api.anthropic.com/v1/messages",{
+      const res=await fetch("https://aura-backend-sigma.vercel.app/api/chat",{
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
           system:`You are Aura, an elite personal AI chief of staff for ${user.name}, who is ${user.role} at ${user.company}. ${projectCtx}You are sharp, professional, warm, and concise. You help with email management, calendar, web research, presentations, LinkedIn, Apollo CRM, and business development. Use **bold** for key terms. Keep replies focused and action-oriented. You know about their pharma exports business, CPHI Japan 2026 project, Sage n Silk brand, and DCAT prospecting work. When asked to do something — do it directly.`,
