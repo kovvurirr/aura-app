@@ -190,7 +190,7 @@ function Sidebar({active,onNav,user,collapsed,onToggle,projects,activeProject,on
           <div style={{width:"32px",height:"32px",borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,var(--accent) 0%,var(--gold) 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"13px",fontWeight:"700",color:"#fff"}}>{user.name[0]}</div>
           <div style={{overflow:"hidden"}}>
             <div style={{fontSize:"12px",fontWeight:"600",color:"var(--text)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user.name}</div>
-            <div style={{fontSize:"10px",color:"var(--text3)"}}>Free Plan ✦ Owner</div>
+            <div style={{fontSize:"10px",color:"var(--text3)",cursor:"pointer"}} onClick={()=>{localStorage.clear();window.location.reload();}}>Free Plan ✦ Owner · Logout</div>
           </div>
         </div>
       )}
