@@ -46,9 +46,9 @@ const fmt=s=>s.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<b
 
 // ── Token Storage ──────────────────────────────────────────────────────────────
 const storage={
-  save:(key,data)=>{try{sessionStorage.setItem(key,JSON.stringify(data));}catch(e){}},
-  get:(key)=>{try{const d=sessionStorage.getItem(key);return d?JSON.parse(d):null;}catch(e){return null;}},
-  clear:(key)=>{try{sessionStorage.removeItem(key);}catch(e){}},
+  save:(key,data)=>{try{localStorage.setItem(key,JSON.stringify(data));}catch(e){}},
+  get:(key)=>{try{const d=localStorage.getItem(key);return d?JSON.parse(d):null;}catch(e){return null;}},
+  clear:(key)=>{try{localStorage.removeItem(key);}catch(e){}},
 };
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
@@ -676,8 +676,8 @@ function OnboardingScreen({onComplete}){
 
 // ── Main App ───────────────────────────────────────────────────────────────────
 export default function AuraApp(){
-  const [authed,setAuthed]=useState(false);
-  const [user,setUser]=useState({name:"Rama Reddy",role:"VP of Global Exports",company:"ALR Labs Pvt. Ltd.",email:"rama@alrlabs.com"});
+  const [authed,setAuthed]=useState(()=>{try{return !!localStorage.getItem("aura_user");}catch(e){return false;}});
+  const [user,setUser]=useState(()=>{try{const u=localStorage.getItem("aura_user");return u?JSON.parse(u):{name:"",role:"",company:"",email:""};}catch(e){return {name:"",role:"",company:"",email:""};}} );
   const [screen,setScreen]=useState("chat");
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
   const [projects,setProjects]=useState(INIT_PROJECTS);
@@ -706,7 +706,7 @@ export default function AuraApp(){
     }
   },[]);
 
-  const handleOnboard=form=>{if(form.name)setUser({...user,...form});setAuthed(true);};
+  const handleOnboard=form=>{const u={...user,...form};if(form.name){setUser(u);try{localStorage.setItem("aura_user",JSON.stringify(u));}catch(e){}}setAuthed(true);};
   const handleNav=id=>{if(id==="new_project"){setShowNewProject(true);}else{setScreen(id);}};
 
   if(!authed)return<OnboardingScreen onComplete={handleOnboard}/>;
