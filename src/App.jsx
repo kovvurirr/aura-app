@@ -31,7 +31,8 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+const API_URL = import.meta.env.VITE_API_URL || "https://aura-backend-sigma.vercel.app";
+
 const TOOLS = [
   {id:"email",icon:"✉",label:"Email",color:"#7B6FD4",desc:"Gmail & Outlook"},
   {id:"calendar",icon:"◫",label:"Calendar",color:"#4ECBA4",desc:"Google Calendar"},
@@ -48,9 +49,7 @@ const QUICK_ACTIONS = [
 ];
 
 const SAMPLE_HISTORY = [
-  {role:"assistant",text:"Good morning, Rama. You have **3 unread emails** requiring attention, a **2 PM call with Tanaka-san**, and I've queued 12 Apollo contacts from your CPHI list for enrichment. What would you like to tackle first?",time:"09:02"},
-  {role:"user",text:"Summarise the email from Daiichi Sankyo",time:"09:04"},
-  {role:"assistant",text:"**Daiichi Sankyo — Procurement Inquiry**\n\nThey're requesting a quotation for **herbal extract APIs** (Ashwagandha, Bacopa) — 500 kg each. Delivery timeline: Q3 2026. They want: COA, MSDS, and regulatory compliance docs.\n\n**Recommended action:** Reply with your standard capability deck + request their vendor onboarding form. Want me to draft the reply?",time:"09:04"},
+  {role:"assistant",text:"Good morning! I'm Aura, your AI chief of staff. Connect your Gmail in the **Connectors** screen to get started with real email access. What can I help you with today?",time:"09:02"},
 ];
 
 const PROVIDER_META = {
@@ -60,25 +59,12 @@ const PROVIDER_META = {
   imap:{label:"Custom/IMAP",color:"#4ECBA4",bg:"rgba(78,203,164,0.12)",icon:"@"},
 };
 
-const INIT_ACCOUNTS = [
-  {id:"a1",provider:"gmail",email:"rama@alrlabs.com",label:"ALR Labs — Work",color:"#EA4335",active:true,unread:3},
-  {id:"a2",provider:"outlook",email:"rama@innoherb.in",label:"Innoherb — Work",color:"#0078D4",active:true,unread:1},
-];
-
-const ALL_EMAILS = [
-  {id:"e1",accountId:"a1",from:"Tanaka Hiroshi",company:"Daiichi Sankyo",subject:"API Quotation Request — Ashwagandha Extract",time:"09:14",unread:true,tag:"urgent"},
-  {id:"e2",accountId:"a1",from:"Priya Nair",company:"Sun Pharma",subject:"Re: CPHI Japan 2026 — Booth Visit Confirmation",time:"08:45",unread:true,tag:"crm"},
-  {id:"e3",accountId:"a2",from:"Marco Bianchi",company:"Recordati S.p.A.",subject:"Due Diligence — Herbal API Supplier Audit",time:"08:10",unread:true,tag:""},
-  {id:"e4",accountId:"a1",from:"Anika Patel",company:"Cipla Ltd.",subject:"Partnership Proposal — Sage n Silk Co-branding",time:"Yest",unread:false,tag:""},
-  {id:"e5",accountId:"a2",from:"Stefan Müller",company:"Boehringer Ingelheim",subject:"Regulatory Documents — MSDS & COA Required",time:"Yest",unread:false,tag:"docs"},
-];
-
 const tagColor={urgent:"var(--red)",crm:"var(--accent)",docs:"var(--gold)"};
 
-const CONNECTORS = [
-  {id:"gmail",name:"Gmail",icon:"G",color:"#EA4335",bg:"rgba(234,67,53,0.12)",category:"Email",desc:"Read, send & manage Gmail",status:"connected"},
-  {id:"outlook",name:"Outlook",icon:"O",color:"#0078D4",bg:"rgba(0,120,212,0.12)",category:"Email",desc:"Microsoft 365 mail & calendar",status:"connected"},
-  {id:"gcal",name:"Google Calendar",icon:"◫",color:"#4ECBA4",bg:"rgba(78,203,164,0.12)",category:"Calendar",desc:"Events, meetings & scheduling",status:"connected"},
+const INIT_CONNECTORS = [
+  {id:"gmail",name:"Gmail",icon:"G",color:"#EA4335",bg:"rgba(234,67,53,0.12)",category:"Email",desc:"Read, send & manage Gmail",status:"disconnected"},
+  {id:"outlook",name:"Outlook",icon:"O",color:"#0078D4",bg:"rgba(0,120,212,0.12)",category:"Email",desc:"Microsoft 365 mail & calendar",status:"disconnected"},
+  {id:"gcal",name:"Google Calendar",icon:"◫",color:"#4ECBA4",bg:"rgba(78,203,164,0.12)",category:"Calendar",desc:"Events, meetings & scheduling",status:"disconnected"},
   {id:"apollo",name:"Apollo.io",icon:"◈",color:"#A99CF0",bg:"rgba(169,156,240,0.12)",category:"CRM",desc:"Prospect enrichment & sequences",status:"connected"},
   {id:"gamma",name:"Gamma",icon:"▦",color:"#E05C5C",bg:"rgba(224,92,92,0.12)",category:"Presentations",desc:"AI-powered slide decks",status:"connected"},
   {id:"linkedin",name:"LinkedIn",icon:"⬡",color:"#5B9BD5",bg:"rgba(91,155,213,0.12)",category:"Social",desc:"Posts, messages & network",status:"needs_install"},
@@ -93,7 +79,39 @@ const CONNECTORS = [
 const PROJECT_COLORS = ["#C9A84C","#7B6FD4","#4ECBA4","#E05C5C","#5B9BD5","#F0A06A","#A99CF0","#EA4335"];
 const PROJECT_ICONS  = ["◉","▦","◈","⊕","✦","◎","⬡","≡"];
 
+const INIT_PROJECTS=[
+  {id:"p1",name:"CPHI Japan 2026",icon:"◈",color:"#A99CF0",desc:"Pharma exhibitor contacts",chats:8,created:"Jan 2026"},
+  {id:"p2",name:"Sage n Silk Launch",icon:"✦",color:"#C9A84C",desc:"Ayurvedic brand strategy",chats:5,created:"Feb 2026"},
+  {id:"p3",name:"DCAT Outreach",icon:"⊕",color:"#4ECBA4",desc:"Member company contacts",chats:12,created:"Mar 2026"},
+];
+
 const fmt = s => s.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>");
+
+// ── Gmail Token Storage ────────────────────────────────────────────────────────
+const gmailStorage = {
+  save:(token,email,name)=>{
+    try{
+      sessionStorage.setItem("gmail_token",token);
+      sessionStorage.setItem("gmail_email",email);
+      sessionStorage.setItem("gmail_name",name);
+    }catch(e){}
+  },
+  get:()=>{
+    try{
+      const token=sessionStorage.getItem("gmail_token");
+      const email=sessionStorage.getItem("gmail_email");
+      const name=sessionStorage.getItem("gmail_name");
+      return token?{token,email,name}:null;
+    }catch(e){return null;}
+  },
+  clear:()=>{
+    try{
+      sessionStorage.removeItem("gmail_token");
+      sessionStorage.removeItem("gmail_email");
+      sessionStorage.removeItem("gmail_name");
+    }catch(e){}
+  },
+};
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
 const GoldOrb = () => (
@@ -102,17 +120,17 @@ const GoldOrb = () => (
     borderRadius:"50%",pointerEvents:"none"}}/>
 );
 
-function Modal({title,subtitle,onClose,children,wide}){
+function Modal({title,subtitle,onClose,children}){
   return(
     <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.75)",
       display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeIn 0.2s ease"}}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{width:`min(${wide?"600px":"440px"},94vw)`,maxHeight:"85vh",overflowY:"auto",
+      <div style={{width:"min(440px,94vw)",maxHeight:"85vh",overflowY:"auto",
         background:"var(--bg1)",borderRadius:"var(--r3)",border:"1px solid var(--border2)",
         boxShadow:"var(--shadow)",animation:"slideUp 0.3s var(--ease)"}}>
         <div style={{padding:"20px 24px 16px",borderBottom:"1px solid var(--border)",
-          display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,
-          background:"var(--bg1)",zIndex:1}}>
+          display:"flex",alignItems:"center",justifyContent:"space-between",
+          position:"sticky",top:0,background:"var(--bg1)",zIndex:1}}>
           <div>
             <h3 style={{fontFamily:"var(--font-d)",fontWeight:"700",fontSize:"16px"}}>{title}</h3>
             {subtitle&&<p style={{fontSize:"11px",color:"var(--text3)",marginTop:"3px"}}>{subtitle}</p>}
@@ -128,15 +146,13 @@ function Modal({title,subtitle,onClose,children,wide}){
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────────
-function Sidebar({active,onNav,user,collapsed,onToggle,projects,activeProject,onSelectProject}){
+function Sidebar({active,onNav,user,collapsed,onToggle,projects,activeProject,onSelectProject,gmailConnected}){
   return(
     <aside style={{width:collapsed?"64px":"230px",minWidth:collapsed?"64px":"230px",
       background:"var(--bg1)",borderRight:"1px solid var(--border)",
       display:"flex",flexDirection:"column",
       transition:"width 0.3s var(--ease),min-width 0.3s var(--ease)",
       overflow:"hidden",position:"relative",zIndex:10}}>
-
-      {/* Logo */}
       <div style={{padding:collapsed?"20px 0":"24px 20px",display:"flex",alignItems:"center",gap:"10px",
         borderBottom:"1px solid var(--border)",justifyContent:collapsed?"center":"flex-start"}}>
         <div style={{width:"32px",height:"32px",borderRadius:"10px",flexShrink:0,
@@ -145,8 +161,6 @@ function Sidebar({active,onNav,user,collapsed,onToggle,projects,activeProject,on
           fontSize:"16px",fontWeight:"700",color:"#0A0A0F",animation:"glow 3s ease-in-out infinite"}}>A</div>
         {!collapsed&&<span style={{fontFamily:"var(--font-d)",fontWeight:"700",fontSize:"18px",color:"var(--gold)",letterSpacing:"-0.02em"}}>Aura</span>}
       </div>
-
-      {/* Main nav */}
       <nav style={{padding:"12px 8px 0",display:"flex",flexDirection:"column",gap:"2px"}}>
         {[{id:"chat",icon:"◉",label:"Chat"},{id:"email",icon:"✉",label:"Email"},
           {id:"calendar",icon:"◫",label:"Calendar"},{id:"research",icon:"⊕",label:"Research"},
@@ -159,20 +173,21 @@ function Sidebar({active,onNav,user,collapsed,onToggle,projects,activeProject,on
             background:active===item.id?"var(--gold-dim)":"transparent",
             border:active===item.id?"1px solid rgba(201,168,76,0.2)":"1px solid transparent",
             color:active===item.id?"var(--gold)":"var(--text2)",fontSize:"13px",fontWeight:"500",
-            transition:"all 0.15s"}}>
+            transition:"all 0.15s",position:"relative"}}>
             <span style={{fontSize:"16px",lineHeight:1}}>{item.icon}</span>
             {!collapsed&&<span>{item.label}</span>}
+            {item.id==="connectors"&&!gmailConnected&&!collapsed&&(
+              <span style={{marginLeft:"auto",width:"6px",height:"6px",borderRadius:"50%",
+                background:"var(--gold)",flexShrink:0}}/>
+            )}
           </button>
         ))}
       </nav>
-
-      {/* Projects section */}
       {!collapsed&&(
         <div style={{padding:"16px 8px 8px"}}>
           <div style={{padding:"0 4px 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:"10px",color:"var(--text3)",fontWeight:"600",textTransform:"uppercase",letterSpacing:"0.08em"}}>Projects</span>
-            <button onClick={()=>onNav("new_project")} style={{
-              width:"18px",height:"18px",borderRadius:"50%",
+            <button onClick={()=>onNav("new_project")} style={{width:"18px",height:"18px",borderRadius:"50%",
               background:"var(--bg3)",border:"1px solid var(--border)",
               color:"var(--text3)",fontSize:"12px",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
           </div>
@@ -189,14 +204,9 @@ function Sidebar({active,onNav,user,collapsed,onToggle,projects,activeProject,on
                 <span style={{fontSize:"10px",color:"var(--text3)",flexShrink:0}}>{p.chats}</span>
               </button>
             ))}
-            {projects.length===0&&(
-              <div style={{padding:"8px 12px",fontSize:"11px",color:"var(--text3)"}}>No projects yet</div>
-            )}
           </div>
         </div>
       )}
-
-      {/* User */}
       {!collapsed&&(
         <div style={{padding:"16px",borderTop:"1px solid var(--border)",marginTop:"auto",
           display:"flex",alignItems:"center",gap:"10px"}}>
@@ -303,14 +313,11 @@ function StatusBar({items}){
 
 // ── New Project Modal ──────────────────────────────────────────────────────────
 function NewProjectModal({onSave,onClose}){
-  const [name,setName]=useState("");
-  const [color,setColor]=useState(PROJECT_COLORS[0]);
-  const [icon,setIcon]=useState(PROJECT_ICONS[0]);
-  const [desc,setDesc]=useState("");
+  const [name,setName]=useState("");const [color,setColor]=useState(PROJECT_COLORS[0]);
+  const [icon,setIcon]=useState(PROJECT_ICONS[0]);const [desc,setDesc]=useState("");
   return(
     <Modal title="New project" subtitle="Organise related chats & context together" onClose={onClose}>
       <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        {/* Preview */}
         <div style={{display:"flex",alignItems:"center",gap:"12px",padding:"14px 16px",
           borderRadius:"var(--r)",background:"var(--bg2)",border:"1px solid var(--border)"}}>
           <div style={{width:"40px",height:"40px",borderRadius:"12px",flexShrink:0,
@@ -323,7 +330,6 @@ function NewProjectModal({onSave,onClose}){
             <div style={{fontSize:"11px",color:"var(--text3)",marginTop:"2px"}}>{desc||"No description"}</div>
           </div>
         </div>
-        {/* Name */}
         <div>
           <label style={{fontSize:"11px",color:"var(--text3)",display:"block",marginBottom:"5px"}}>Project name</label>
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. CPHI Japan 2026"
@@ -332,39 +338,30 @@ function NewProjectModal({onSave,onClose}){
             onFocus={e=>e.target.style.borderColor="rgba(201,168,76,0.4)"}
             onBlur={e=>e.target.style.borderColor="var(--border)"}/>
         </div>
-        {/* Description */}
         <div>
-          <label style={{fontSize:"11px",color:"var(--text3)",display:"block",marginBottom:"5px"}}>Description <span style={{color:"var(--text3)",fontWeight:"300"}}>(optional)</span></label>
+          <label style={{fontSize:"11px",color:"var(--text3)",display:"block",marginBottom:"5px"}}>Description</label>
           <input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="What's this project about?"
             style={{width:"100%",padding:"10px 14px",borderRadius:"var(--r)",background:"var(--bg2)",
               border:"1px solid var(--border)",color:"var(--text)",fontSize:"13px"}}
             onFocus={e=>e.target.style.borderColor="rgba(201,168,76,0.4)"}
             onBlur={e=>e.target.style.borderColor="var(--border)"}/>
         </div>
-        {/* Icon picker */}
         <div>
           <label style={{fontSize:"11px",color:"var(--text3)",display:"block",marginBottom:"8px"}}>Icon</label>
           <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
             {PROJECT_ICONS.map(ic=>(
-              <button key={ic} onClick={()=>setIcon(ic)} style={{
-                width:"36px",height:"36px",borderRadius:"10px",fontSize:"18px",
-                background:icon===ic?`${color}22`:"var(--bg2)",
-                border:`1px solid ${icon===ic?color:"var(--border)"}`,
-                color:icon===ic?color:"var(--text2)",transition:"all 0.15s"}}>
-                {ic}
-              </button>
+              <button key={ic} onClick={()=>setIcon(ic)} style={{width:"36px",height:"36px",borderRadius:"10px",fontSize:"18px",
+                background:icon===ic?`${color}22`:"var(--bg2)",border:`1px solid ${icon===ic?color:"var(--border)"}`,
+                color:icon===ic?color:"var(--text2)",transition:"all 0.15s"}}>{ic}</button>
             ))}
           </div>
         </div>
-        {/* Color picker */}
         <div>
           <label style={{fontSize:"11px",color:"var(--text3)",display:"block",marginBottom:"8px"}}>Colour</label>
           <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
             {PROJECT_COLORS.map(c=>(
-              <button key={c} onClick={()=>setColor(c)} style={{
-                width:"24px",height:"24px",borderRadius:"50%",background:c,border:"none",
-                outline:color===c?`2px solid ${c}`:"2px solid transparent",
-                outlineOffset:"2px",transition:"all 0.15s"}}/>
+              <button key={c} onClick={()=>setColor(c)} style={{width:"24px",height:"24px",borderRadius:"50%",background:c,border:"none",
+                outline:color===c?`2px solid ${c}`:"2px solid transparent",outlineOffset:"2px",transition:"all 0.15s"}}/>
             ))}
           </div>
         </div>
@@ -381,7 +378,7 @@ function NewProjectModal({onSave,onClose}){
 }
 
 // ── Chat Screen ────────────────────────────────────────────────────────────────
-function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject,onNav}){
+function ChatScreen({user,projects,activeProject,onSelectProject,onNav,gmailAccount}){
   const [msgs,setMsgs]=useState(SAMPLE_HISTORY);
   const [loading,setLoading]=useState(false);
   const [isListening,setIsListening]=useState(false);
@@ -391,7 +388,6 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
 
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"})},[msgs,loading]);
   const now=()=>new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
-
   const activeProj=projects.find(p=>p.id===activeProject)||null;
 
   const callAura=useCallback(async(userText)=>{
@@ -400,16 +396,17 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
     try{
       const history=[...msgs,userMsg].map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
       const projectCtx=activeProj?`Current project: "${activeProj.name}" — ${activeProj.desc||""}. `:"";
-      const res=await fetch("https://aura-backend-sigma.vercel.app/api/chat",{
+      const gmailCtx=gmailAccount?`Gmail connected: ${gmailAccount.email}. You can reference their real inbox. `:"Gmail not connected yet. ";
+      const res=await fetch(`${API_URL}/api/chat`,{
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,
-          system:`You are Aura, an elite personal AI chief of staff for ${user.name}, who is ${user.role} at ${user.company}. ${projectCtx}You are sharp, professional, warm, and concise. You help with email management, calendar, web research, presentations, LinkedIn, Apollo CRM, and business development. Use **bold** for key terms. Keep replies focused and action-oriented. You know about their pharma exports business, CPHI Japan 2026 project, Sage n Silk brand, and DCAT prospecting work. When asked to do something — do it directly.`,
+          system:`You are Aura, an elite personal AI chief of staff for ${user.name}, who is ${user.role} at ${user.company}. ${projectCtx}${gmailCtx}You are sharp, professional, warm, and concise. You help with email management, calendar, web research, presentations, LinkedIn, Apollo CRM, and business development. Use **bold** for key terms. Keep replies focused and action-oriented. You know about their pharma exports business, CPHI Japan 2026 project, Sage n Silk brand, and DCAT prospecting work. When asked to do something — do it directly.`,
           messages:history})});
       const data=await res.json();
       setMsgs(m=>[...m,{role:"assistant",text:data.content?.[0]?.text||"Something went wrong.",time:now()}]);
     }catch{setMsgs(m=>[...m,{role:"assistant",text:"Connection issue — please try again.",time:now()}]);}
     setLoading(false);
-  },[msgs,user,activeProj]);
+  },[msgs,user,activeProj,gmailAccount]);
 
   const startVoice=()=>{
     if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){alert("Voice needs Chrome.");return;}
@@ -420,10 +417,14 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
     r.onend=()=>setIsListening(false);r.start();recognitionRef.current=r;setIsListening(true);
   };
 
+  const statusItems=[
+    {label:gmailAccount?`Gmail: ${gmailAccount.email}`:"Gmail — not connected",ok:!!gmailAccount},
+    {label:"Apollo",ok:true},{label:"Research",ok:true},{label:"Gamma",ok:true},
+  ];
+
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100%",position:"relative",overflow:"hidden"}}>
       <GoldOrb/>
-      {/* Header */}
       <div style={{padding:"16px 24px 12px",borderBottom:"1px solid var(--border)",
         display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px"}}>
         <div style={{flex:1,minWidth:0}}>
@@ -434,7 +435,6 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
             {new Date().toLocaleDateString("en-IN",{weekday:"long",month:"long",day:"numeric"})}
           </p>
         </div>
-        {/* Project picker */}
         <div style={{position:"relative"}}>
           <button onClick={()=>setShowProjectMenu(m=>!m)} style={{
             display:"flex",alignItems:"center",gap:"7px",padding:"7px 12px",borderRadius:"100px",
@@ -467,7 +467,6 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
                   fontSize:"12px",transition:"all 0.15s",textAlign:"left"}}>
                   <span style={{color:p.color}}>{p.icon}</span>
                   <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
-                  <span style={{fontSize:"10px",color:"var(--text3)"}}>{p.chats}</span>
                 </button>
               ))}
               <div style={{borderTop:"1px solid var(--border)",marginTop:"6px",paddingTop:"6px"}}>
@@ -487,7 +486,6 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
           border:"1px solid rgba(201,168,76,0.25)",fontSize:"11px",color:"var(--gold)",fontWeight:"600",flexShrink:0}}>FREE</div>
       </div>
 
-      {/* Project context banner */}
       {activeProj&&(
         <div style={{padding:"8px 24px",background:`${activeProj.color}0D`,
           borderBottom:`1px solid ${activeProj.color}22`,display:"flex",alignItems:"center",gap:"8px"}}>
@@ -497,11 +495,8 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
         </div>
       )}
 
-      <StatusBar items={[
-        {label:"Gmail",ok:true},{label:"Outlook",ok:true},{label:"Calendar",ok:true},
-        {label:"Apollo",ok:true},{label:"Research",ok:true}]}/>
+      <StatusBar items={statusItems}/>
 
-      {/* Quick actions */}
       <div style={{padding:"10px 20px 8px",display:"flex",gap:"8px",overflowX:"auto",
         scrollbarWidth:"none",borderBottom:"1px solid var(--border)"}}>
         {QUICK_ACTIONS.map((a,i)=>(
@@ -516,14 +511,22 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
         ))}
       </div>
 
-      {/* Messages */}
       <div style={{flex:1,overflowY:"auto",padding:"20px",display:"flex",flexDirection:"column",gap:"16px"}}>
+        {!gmailAccount&&(
+          <div style={{padding:"14px 16px",borderRadius:"var(--r)",
+            background:"var(--gold-dim)",border:"1px solid rgba(201,168,76,0.3)",
+            display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px"}}>
+            <span style={{fontSize:"13px",color:"var(--gold)"}}>✦ Connect Gmail to unlock your real inbox</span>
+            <button onClick={()=>onNav("connectors")} style={{
+              padding:"6px 14px",borderRadius:"100px",background:"var(--gold)",border:"none",
+              color:"#0A0A0F",fontSize:"12px",fontWeight:"700",flexShrink:0}}>Connect</button>
+          </div>
+        )}
         {msgs.map((m,i)=><Message key={i} msg={m} isNew={i===newIdx}/>)}
         {loading&&<TypingIndicator/>}
         <div ref={endRef}/>
       </div>
 
-      {/* Tool chips */}
       <div style={{padding:"8px 20px 4px",display:"flex",gap:"6px",overflowX:"auto",scrollbarWidth:"none"}}>
         {TOOLS.map(t=>(
           <button key={t.id} onClick={()=>callAura(`Use ${t.label}: ${t.desc}`)} style={{
@@ -542,216 +545,149 @@ function ChatScreen({user,projects,activeProject,onSelectProject,onCreateProject
 }
 
 // ── Email Screen ───────────────────────────────────────────────────────────────
-function AddAccountModal({onAdd,onClose}){
-  const [step,setStep]=useState(0);const [provider,setProvider]=useState(null);
-  const [email,setEmail]=useState("");const [label,setLabel]=useState("");
-  const providers=Object.entries(PROVIDER_META).map(([id,m])=>({id,...m}));
-  const canSave=email.includes("@")&&label.trim();
-  const handleSave=()=>{
-    const meta=PROVIDER_META[provider];
-    onAdd({id:"a"+Date.now(),provider,email,label:label||email,color:meta.color,active:true,unread:0});
-    onClose();
-  };
-  return(
-    <Modal title={step===0?"Add email account":`Connect ${PROVIDER_META[provider]?.label||""}`}
-      subtitle={step===0?"Choose your email provider":"Enter your account details"} onClose={onClose}>
-      {step===0?(
-        <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-          {providers.map(p=>(
-            <button key={p.id} onClick={()=>{setProvider(p.id);setStep(1);}} style={{
-              display:"flex",alignItems:"center",gap:"14px",padding:"14px 16px",borderRadius:"var(--r)",
-              background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--text)",
-              textAlign:"left",transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=p.color;e.currentTarget.style.background=p.bg;}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.background="var(--bg2)";}}>
-              <div style={{width:"36px",height:"36px",borderRadius:"10px",background:p.bg,
-                border:`1px solid ${p.color}44`,display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:"16px",fontWeight:"700",color:p.color,flexShrink:0}}>{p.icon}</div>
-              <div><div style={{fontSize:"13px",fontWeight:"600"}}>{p.label}</div>
-                <div style={{fontSize:"11px",color:"var(--text3)",marginTop:"2px"}}>
-                  {p.id==="imap"?"Any email via IMAP/SMTP":`Sign in with ${p.label}`}</div>
-              </div>
-              <span style={{marginLeft:"auto",color:"var(--text3)",fontSize:"16px"}}>›</span>
-            </button>
-          ))}
-        </div>
-      ):(
-        <div style={{display:"flex",flexDirection:"column",gap:"14px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:"10px",padding:"10px 14px",
-            borderRadius:"var(--r)",background:PROVIDER_META[provider].bg,
-            border:`1px solid ${PROVIDER_META[provider].color}44`}}>
-            <div style={{width:"28px",height:"28px",borderRadius:"8px",background:PROVIDER_META[provider].bg,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:"14px",fontWeight:"700",color:PROVIDER_META[provider].color}}>
-              {PROVIDER_META[provider].icon}</div>
-            <span style={{fontSize:"12px",fontWeight:"600",color:PROVIDER_META[provider].color}}>
-              {PROVIDER_META[provider].label}</span>
-            <button onClick={()=>setStep(0)} style={{marginLeft:"auto",background:"none",border:"none",color:"var(--text3)",fontSize:"11px"}}>Change</button>
-          </div>
-          {[["Email address","you@example.com","email",setEmail,email],["Nickname","Work / Personal…","text",setLabel,label]].map(([lbl,ph,type,set,val])=>(
-            <div key={lbl}>
-              <label style={{fontSize:"11px",color:"var(--text3)",display:"block",marginBottom:"5px"}}>{lbl}</label>
-              <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} type={type}
-                style={{width:"100%",padding:"10px 14px",borderRadius:"var(--r)",background:"var(--bg2)",
-                  border:"1px solid var(--border)",color:"var(--text)",fontSize:"13px",transition:"border-color 0.2s"}}
-                onFocus={e=>e.target.style.borderColor="rgba(201,168,76,0.4)"}
-                onBlur={e=>e.target.style.borderColor="var(--border)"}/>
-            </div>
-          ))}
-          <div style={{padding:"10px 14px",borderRadius:"var(--r)",background:"var(--bg3)",
-            border:"1px solid var(--border)",fontSize:"11px",color:"var(--text3)",lineHeight:"1.5"}}>
-            🔐 In production — connects via <strong style={{color:"var(--text2)"}}>OAuth 2.0</strong>. No password stored.
-          </div>
-          <button onClick={handleSave} disabled={!canSave} style={{width:"100%",padding:"12px",borderRadius:"var(--r)",
-            background:canSave?"var(--gold)":"var(--bg3)",border:"none",
-            color:canSave?"#0A0A0F":"var(--text3)",fontSize:"14px",fontWeight:"700",
-            fontFamily:"var(--font-d)",marginTop:"4px",transition:"all 0.2s"}}>
-            Connect account →
-          </button>
-        </div>
-      )}
-    </Modal>
-  );
-}
+function EmailScreen({gmailAccount,onNav}){
+  const [emails,setEmails]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState(null);
 
-function EmailScreen(){
-  const [accounts,setAccounts]=useState(INIT_ACCOUNTS);
-  const [activeAccId,setActiveAccId]=useState("all");
-  const [showModal,setShowModal]=useState(false);
-  const [emails]=useState(ALL_EMAILS);
-  const visibleEmails=activeAccId==="all"?emails:emails.filter(e=>e.accountId===activeAccId);
-  const totalUnread=accounts.reduce((s,a)=>s+a.unread,0);
-  const removeAccount=id=>{setAccounts(a=>a.filter(acc=>acc.id!==id));if(activeAccId===id)setActiveAccId("all");};
-  return(
-    <>
-      {showModal&&<AddAccountModal onAdd={acc=>setAccounts(a=>[...a,acc])} onClose={()=>setShowModal(false)}/>}
-      <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-        <div style={{padding:"18px 24px 14px",borderBottom:"1px solid var(--border)",
-          display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div>
-            <h2 style={{fontFamily:"var(--font-d)",fontWeight:"700",fontSize:"18px"}}>Inbox</h2>
-            <p style={{fontSize:"12px",color:"var(--text3)",marginTop:"2px"}}>
-              {totalUnread} unread · {accounts.length} account{accounts.length!==1?"s":""} connected</p>
-          </div>
-          <button style={{padding:"8px 16px",borderRadius:"100px",background:"var(--gold)",
-            border:"none",color:"#0A0A0F",fontSize:"12px",fontWeight:"600"}}>+ Compose</button>
-        </div>
-        {/* Account tabs */}
-        <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",
-          display:"flex",gap:"6px",overflowX:"auto",scrollbarWidth:"none",alignItems:"center"}}>
-          <button onClick={()=>setActiveAccId("all")} style={{
-            display:"flex",alignItems:"center",gap:"6px",padding:"7px 14px",borderRadius:"100px",flexShrink:0,
-            background:activeAccId==="all"?"var(--gold-dim)":"var(--bg2)",
-            border:activeAccId==="all"?"1px solid rgba(201,168,76,0.3)":"1px solid var(--border)",
-            color:activeAccId==="all"?"var(--gold)":"var(--text2)",fontSize:"12px",fontWeight:"500",transition:"all 0.15s"}}>
-            <span style={{fontSize:"14px"}}>◉</span>All inboxes
-            {totalUnread>0&&<span style={{background:"var(--gold)",color:"#0A0A0F",borderRadius:"100px",
-              fontSize:"10px",fontWeight:"700",padding:"1px 6px"}}>{totalUnread}</span>}
-          </button>
-          {accounts.map(acc=>{
-            const meta=PROVIDER_META[acc.provider]||PROVIDER_META.imap;const isActive=activeAccId===acc.id;
-            return(
-              <div key={acc.id} style={{position:"relative",flexShrink:0}}>
-                <button onClick={()=>setActiveAccId(acc.id)} style={{
-                  display:"flex",alignItems:"center",gap:"7px",padding:"7px 30px 7px 14px",borderRadius:"100px",
-                  background:isActive?`${acc.color}1A`:"var(--bg2)",
-                  border:isActive?`1px solid ${acc.color}55`:"1px solid var(--border)",
-                  color:isActive?acc.color:"var(--text2)",fontSize:"12px",fontWeight:"500",transition:"all 0.15s"}}>
-                  <div style={{width:"18px",height:"18px",borderRadius:"50%",background:meta.bg,
-                    border:`1px solid ${acc.color}55`,display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:"9px",fontWeight:"800",color:acc.color}}>{meta.icon}</div>
-                  <span style={{maxWidth:"80px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{acc.label}</span>
-                  {acc.unread>0&&<span style={{background:acc.color,color:"#fff",borderRadius:"100px",
-                    fontSize:"10px",fontWeight:"700",padding:"1px 5px"}}>{acc.unread}</span>}
-                </button>
-                <button onClick={e=>{e.stopPropagation();removeAccount(acc.id);}} style={{
-                  position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",
-                  width:"16px",height:"16px",borderRadius:"50%",background:"var(--bg3)",
-                  border:"1px solid var(--border)",color:"var(--text3)",fontSize:"9px",
-                  display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.background="var(--red)";e.currentTarget.style.color="#fff";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="var(--bg3)";e.currentTarget.style.color="var(--text3)";}}>✕</button>
-              </div>
-            );
-          })}
-          <button onClick={()=>setShowModal(true)} style={{
-            display:"flex",alignItems:"center",gap:"5px",padding:"7px 12px",borderRadius:"100px",flexShrink:0,
-            background:"var(--bg2)",border:"1px dashed var(--border2)",color:"var(--text3)",fontSize:"12px",transition:"all 0.15s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)";}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text3)";}}>
-            <span style={{fontSize:"16px",lineHeight:1}}>+</span>Add account
-          </button>
-        </div>
-        {/* Emails */}
-        <div style={{flex:1,overflowY:"auto"}}>
-          {visibleEmails.map(e=>{
-            const acc=accounts.find(a=>a.id===e.accountId);
-            const meta=acc?PROVIDER_META[acc.provider]||PROVIDER_META.imap:null;
-            return(
-              <div key={e.id} style={{padding:"14px 24px",borderBottom:"1px solid var(--border)",
-                display:"flex",gap:"12px",alignItems:"flex-start",
-                background:e.unread?"rgba(201,168,76,0.03)":"transparent",cursor:"pointer",transition:"background 0.15s"}}
-                onMouseEnter={el=>el.currentTarget.style.background="var(--bg2)"}
-                onMouseLeave={el=>el.currentTarget.style.background=e.unread?"rgba(201,168,76,0.03)":"transparent"}>
-                <div style={{position:"relative",flexShrink:0}}>
-                  <div style={{width:"36px",height:"36px",borderRadius:"50%",background:"var(--bg3)",
-                    border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:"14px",fontWeight:"600",color:"var(--text2)"}}>{e.from[0]}</div>
-                  {meta&&<div style={{position:"absolute",bottom:"-2px",right:"-2px",width:"14px",height:"14px",
-                    borderRadius:"50%",background:meta.bg,border:`1px solid ${acc.color}66`,
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:"7px",fontWeight:"800",color:acc.color}}>{meta.icon}</div>}
-                </div>
-                <div style={{flex:1,overflow:"hidden"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"2px"}}>
-                    <span style={{fontSize:"13px",fontWeight:e.unread?"600":"400",color:"var(--text)"}}>{e.from}</span>
-                    <span style={{fontSize:"11px",color:"var(--text3)",marginLeft:"8px",flexShrink:0}}>{e.time}</span>
-                  </div>
-                  {activeAccId==="all"&&acc&&(
-                    <div style={{display:"inline-flex",alignItems:"center",gap:"4px",padding:"1px 7px",
-                      borderRadius:"100px",marginBottom:"3px",background:`${acc.color}18`,
-                      border:`1px solid ${acc.color}33`,fontSize:"10px",color:acc.color,fontWeight:"600"}}>{acc.label}</div>
-                  )}
-                  <div style={{fontSize:"12px",color:"var(--text2)",marginBottom:"3px"}}>{e.company}</div>
-                  <div style={{fontSize:"13px",color:e.unread?"var(--text)":"var(--text2)",
-                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.subject}</div>
-                  {e.tag&&<span style={{display:"inline-block",marginTop:"5px",padding:"2px 8px",borderRadius:"100px",
-                    background:`${tagColor[e.tag]}22`,color:tagColor[e.tag],
-                    fontSize:"10px",fontWeight:"600",textTransform:"uppercase",letterSpacing:"0.05em"}}>{e.tag}</span>}
-                </div>
-                {e.unread&&<div style={{width:"7px",height:"7px",borderRadius:"50%",background:"var(--gold)",flexShrink:0,marginTop:"5px"}}/>}
-              </div>
-            );
-          })}
-        </div>
+  useEffect(()=>{
+    if(gmailAccount?.token){
+      setLoading(true);
+      fetch(`${API_URL}/api/gmail?action=inbox`,{
+        headers:{Authorization:`Bearer ${gmailAccount.token}`}
+      })
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.messages)setEmails(data.messages);
+        else setError(data.error||"Failed to load inbox");
+      })
+      .catch(()=>setError("Connection error"))
+      .finally(()=>setLoading(false));
+    }
+  },[gmailAccount]);
+
+  if(!gmailAccount){
+    return(
+      <div style={{display:"flex",flexDirection:"column",height:"100%",alignItems:"center",justifyContent:"center",gap:"16px",padding:"32px"}}>
+        <div style={{fontSize:"32px"}}>✉</div>
+        <h2 style={{fontFamily:"var(--font-d)",fontWeight:"700",fontSize:"20px"}}>Connect your Gmail</h2>
+        <p style={{fontSize:"14px",color:"var(--text2)",textAlign:"center",maxWidth:"320px",lineHeight:"1.6"}}>
+          Connect your Gmail account to read, summarise, and reply to real emails with Aura.
+        </p>
+        <button onClick={()=>onNav("connectors")} style={{
+          padding:"12px 28px",borderRadius:"100px",background:"var(--gold)",border:"none",
+          color:"#0A0A0F",fontSize:"14px",fontWeight:"700",fontFamily:"var(--font-d)"}}>
+          Connect Gmail →
+        </button>
       </div>
-    </>
+    );
+  }
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+      <div style={{padding:"18px 24px 14px",borderBottom:"1px solid var(--border)",
+        display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div>
+          <h2 style={{fontFamily:"var(--font-d)",fontWeight:"700",fontSize:"18px"}}>Inbox</h2>
+          <p style={{fontSize:"12px",color:"var(--text3)",marginTop:"2px"}}>
+            {gmailAccount.email} · {loading?"Loading…":`${emails.filter(e=>e.unread).length} unread`}
+          </p>
+        </div>
+        <button onClick={()=>{setLoading(true);fetch(`${API_URL}/api/gmail?action=inbox`,{headers:{Authorization:`Bearer ${gmailAccount.token}`}}).then(r=>r.json()).then(d=>{if(d.messages)setEmails(d.messages);}).finally(()=>setLoading(false));}} style={{
+          padding:"8px 16px",borderRadius:"100px",background:"var(--bg2)",
+          border:"1px solid var(--border)",color:"var(--text2)",fontSize:"12px"}}>
+          ↻ Refresh
+        </button>
+      </div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        {loading&&(
+          <div style={{padding:"48px",textAlign:"center",color:"var(--text3)",fontSize:"13px"}}>
+            Loading your inbox…
+          </div>
+        )}
+        {error&&(
+          <div style={{padding:"24px",margin:"16px",borderRadius:"var(--r)",
+            background:"rgba(224,92,92,0.08)",border:"1px solid rgba(224,92,92,0.2)",
+            fontSize:"13px",color:"var(--red)"}}>
+            {error}
+          </div>
+        )}
+        {!loading&&emails.map(e=>{
+          const fromName=e.from?.replace(/<.*>/,"").trim()||e.from;
+          const fromEmail=e.from?.match(/<(.+)>/)?.[1]||"";
+          const date=new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+          return(
+            <div key={e.id} style={{padding:"14px 24px",borderBottom:"1px solid var(--border)",
+              display:"flex",gap:"12px",alignItems:"flex-start",
+              background:e.unread?"rgba(201,168,76,0.03)":"transparent",
+              cursor:"pointer",transition:"background 0.15s"}}
+              onMouseEnter={el=>el.currentTarget.style.background="var(--bg2)"}
+              onMouseLeave={el=>el.currentTarget.style.background=e.unread?"rgba(201,168,76,0.03)":"transparent"}>
+              <div style={{width:"36px",height:"36px",borderRadius:"50%",flexShrink:0,
+                background:"var(--bg3)",border:"1px solid var(--border)",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:"14px",fontWeight:"600",color:"var(--text2)"}}>
+                {fromName[0]?.toUpperCase()||"?"}
+              </div>
+              <div style={{flex:1,overflow:"hidden"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"2px"}}>
+                  <span style={{fontSize:"13px",fontWeight:e.unread?"600":"400",color:"var(--text)"}}>{fromName}</span>
+                  <span style={{fontSize:"11px",color:"var(--text3)",marginLeft:"8px",flexShrink:0}}>{date}</span>
+                </div>
+                {fromEmail&&<div style={{fontSize:"11px",color:"var(--text3)",marginBottom:"3px"}}>{fromEmail}</div>}
+                <div style={{fontSize:"13px",fontWeight:e.unread?"500":"400",color:e.unread?"var(--text)":"var(--text2)",
+                  marginBottom:"3px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.subject}</div>
+                <div style={{fontSize:"12px",color:"var(--text3)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.snippet}</div>
+              </div>
+              {e.unread&&<div style={{width:"7px",height:"7px",borderRadius:"50%",background:"var(--gold)",flexShrink:0,marginTop:"5px"}}/>}
+            </div>
+          );
+        })}
+        {!loading&&emails.length===0&&!error&&(
+          <div style={{padding:"48px",textAlign:"center",color:"var(--text3)",fontSize:"13px"}}>Inbox is empty.</div>
+        )}
+      </div>
+    </div>
   );
 }
 
 // ── Connectors Screen ──────────────────────────────────────────────────────────
-function ConnectorsScreen(){
-  const [connectors,setConnectors]=useState(CONNECTORS);
+function ConnectorsScreen({gmailAccount,onGmailConnect,onGmailDisconnect}){
+  const [connectors,setConnectors]=useState(()=>
+    INIT_CONNECTORS.map(c=>c.id==="gmail"?{...c,status:gmailAccount?"connected":"disconnected"}:c)
+  );
   const [filter,setFilter]=useState("All");
   const [search,setSearch]=useState("");
-  const categories=["All",...[...new Set(CONNECTORS.map(c=>c.category))]];
+  const [connecting,setConnecting]=useState(null);
+  const categories=["All",...[...new Set(INIT_CONNECTORS.map(c=>c.category))]];
 
-  const statusLabel={connected:"Connected",needs_install:"Install needed",disconnected:"Connect"};
   const statusColor={connected:"var(--green)",needs_install:"var(--gold)",disconnected:"var(--text3)"};
-  const statusBg={connected:"rgba(78,203,164,0.12)",needs_install:"var(--gold-dim)",disconnected:"var(--bg3)"};
 
-  const toggle=id=>{
-    setConnectors(cs=>cs.map(c=>{
-      if(c.id!==id)return c;
-      if(c.status==="connected")return{...c,status:"disconnected"};
-      if(c.status==="disconnected")return{...c,status:"connected"};
-      return c;
+  const handleConnect=async(c)=>{
+    if(c.id==="gmail"){
+      if(c.status==="connected"){
+        onGmailDisconnect();
+        setConnectors(cs=>cs.map(x=>x.id==="gmail"?{...x,status:"disconnected"}:x));
+        return;
+      }
+      setConnecting("gmail");
+      try{
+        const res=await fetch(`${API_URL}/api/gmail?action=auth`);
+        const data=await res.json();
+        if(data.url)window.location.href=data.url;
+      }catch(e){alert("Failed to start Gmail auth. Check backend.");}
+      setConnecting(null);
+      return;
+    }
+    setConnectors(cs=>cs.map(x=>{
+      if(x.id!==c.id)return x;
+      return{...x,status:x.status==="connected"?"disconnected":"connected"};
     }));
   };
 
   const visible=connectors.filter(c=>{
     const matchCat=filter==="All"||c.category===filter;
-    const matchSearch=!search||c.name.toLowerCase().includes(search.toLowerCase())||c.category.toLowerCase().includes(search.toLowerCase());
+    const matchSearch=!search||c.name.toLowerCase().includes(search.toLowerCase());
     return matchCat&&matchSearch;
   });
 
@@ -759,31 +695,22 @@ function ConnectorsScreen(){
 
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-      {/* Header */}
       <div style={{padding:"18px 24px 14px",borderBottom:"1px solid var(--border)"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}}>
           <div>
             <h2 style={{fontFamily:"var(--font-d)",fontWeight:"700",fontSize:"18px"}}>Connectors</h2>
-            <p style={{fontSize:"12px",color:"var(--text3)",marginTop:"2px"}}>
-              {connected} of {connectors.length} connected
-            </p>
+            <p style={{fontSize:"12px",color:"var(--text3)",marginTop:"2px"}}>{connected} of {connectors.length} connected</p>
           </div>
-          {/* Summary pills */}
           <div style={{display:"flex",gap:"6px"}}>
-            {[{label:`${connected} active`,color:"var(--green)",bg:"rgba(78,203,164,0.12)"},
-              {label:`${connectors.filter(c=>c.status==="disconnected").length} available`,color:"var(--text2)",bg:"var(--bg2)"}].map(p=>(
-              <div key={p.label} style={{padding:"5px 12px",borderRadius:"100px",
-                background:p.bg,border:"1px solid var(--border)",fontSize:"11px",color:p.color,fontWeight:"600"}}>{p.label}</div>
-            ))}
+            <div style={{padding:"5px 12px",borderRadius:"100px",background:"rgba(78,203,164,0.12)",
+              border:"1px solid var(--border)",fontSize:"11px",color:"var(--green)",fontWeight:"600"}}>{connected} active</div>
           </div>
         </div>
-        {/* Search */}
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search connectors…"
           style={{width:"100%",padding:"9px 14px",borderRadius:"var(--r)",background:"var(--bg2)",
             border:"1px solid var(--border)",color:"var(--text)",fontSize:"13px",marginBottom:"10px"}}
           onFocus={e=>e.target.style.borderColor="rgba(201,168,76,0.4)"}
           onBlur={e=>e.target.style.borderColor="var(--border)"}/>
-        {/* Category filters */}
         <div style={{display:"flex",gap:"6px",overflowX:"auto",scrollbarWidth:"none"}}>
           {categories.map(cat=>(
             <button key={cat} onClick={()=>setFilter(cat)} style={{
@@ -796,21 +723,18 @@ function ConnectorsScreen(){
           ))}
         </div>
       </div>
-
-      {/* Connector grid */}
       <div style={{flex:1,overflowY:"auto",padding:"16px"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:"10px"}}>
           {visible.map(c=>(
             <div key={c.id} style={{padding:"16px",borderRadius:"var(--r2)",background:"var(--bg2)",
               border:`1px solid ${c.status==="connected"?"var(--border2)":"var(--border)"}`,
-              transition:"all 0.2s",cursor:"default"}}
+              transition:"all 0.2s"}}
               onMouseEnter={e=>e.currentTarget.style.borderColor=c.color+"66"}
               onMouseLeave={e=>e.currentTarget.style.borderColor=c.status==="connected"?"var(--border2)":"var(--border)"}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"10px"}}>
                 <div style={{width:"40px",height:"40px",borderRadius:"12px",background:c.bg,
                   border:`1px solid ${c.color}33`,display:"flex",alignItems:"center",justifyContent:"center",
                   fontSize:"18px",fontWeight:"700",color:c.color}}>{c.icon}</div>
-                {/* Status indicator dot */}
                 <div style={{display:"flex",alignItems:"center",gap:"5px"}}>
                   <div style={{width:"7px",height:"7px",borderRadius:"50%",
                     background:statusColor[c.status],
@@ -821,16 +745,21 @@ function ConnectorsScreen(){
                 </div>
               </div>
               <div style={{fontSize:"13px",fontWeight:"600",color:"var(--text)",marginBottom:"3px"}}>{c.name}</div>
+              {c.id==="gmail"&&gmailAccount&&(
+                <div style={{fontSize:"11px",color:"var(--green)",marginBottom:"3px"}}>{gmailAccount.email}</div>
+              )}
               <div style={{fontSize:"11px",color:"var(--text3)",marginBottom:"12px",lineHeight:"1.4"}}>{c.desc}</div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <span style={{padding:"3px 8px",borderRadius:"100px",background:"var(--bg3)",
                   border:"1px solid var(--border)",fontSize:"10px",color:"var(--text3)"}}>{c.category}</span>
-                <button onClick={()=>toggle(c.id)} style={{
-                  padding:"6px 14px",borderRadius:"100px",fontSize:"11px",fontWeight:"600",
-                  background:c.status==="connected"?`${c.color}18`:c.status==="needs_install"?"var(--gold-dim)":"var(--bg3)",
-                  border:`1px solid ${c.status==="connected"?c.color+"44":c.status==="needs_install"?"rgba(201,168,76,0.3)":"var(--border)"}`,
-                  color:statusColor[c.status],transition:"all 0.15s"}}>
-                  {c.status==="connected"?"Disconnect":statusLabel[c.status]}
+                <button onClick={()=>handleConnect(c)}
+                  disabled={connecting===c.id}
+                  style={{padding:"6px 14px",borderRadius:"100px",fontSize:"11px",fontWeight:"600",
+                    background:c.status==="connected"?`${c.color}18`:c.status==="needs_install"?"var(--gold-dim)":"var(--bg3)",
+                    border:`1px solid ${c.status==="connected"?c.color+"44":c.status==="needs_install"?"rgba(201,168,76,0.3)":"var(--border)"}`,
+                    color:statusColor[c.status],transition:"all 0.15s",
+                    opacity:connecting===c.id?0.6:1}}>
+                  {connecting===c.id?"Connecting…":c.status==="connected"?"Disconnect":c.status==="needs_install"?"Install":"Connect"}
                 </button>
               </div>
             </div>
@@ -887,7 +816,7 @@ function CRMScreen(){
 }
 
 // ── Settings Screen ────────────────────────────────────────────────────────────
-function SettingsScreen({user}){
+function SettingsScreen({user,gmailAccount,onGmailDisconnect}){
   const plans=[
     {id:"free",label:"Free",price:"₹0",desc:"Owner only · All tools",color:"var(--green)",current:true},
     {id:"starter",label:"Starter",price:"₹999",desc:"1 user · Email + Chat",color:"var(--text2)"},
@@ -913,29 +842,24 @@ function SettingsScreen({user}){
           </div>
         </section>
         <section>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}}>
-            <h3 style={{fontSize:"12px",color:"var(--text3)",fontWeight:"600",textTransform:"uppercase",letterSpacing:"0.08em"}}>Email accounts</h3>
-            <button style={{padding:"4px 12px",borderRadius:"100px",background:"var(--gold-dim)",
-              border:"1px solid rgba(201,168,76,0.25)",color:"var(--gold)",fontSize:"11px",fontWeight:"600"}}>+ Add</button>
-          </div>
+          <h3 style={{fontSize:"12px",color:"var(--text3)",fontWeight:"600",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"12px"}}>Connected accounts</h3>
           <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-            {INIT_ACCOUNTS.map(acc=>{
-              const meta=PROVIDER_META[acc.provider]||PROVIDER_META.imap;
-              return(
-                <div key={acc.id} style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px 14px",
-                  borderRadius:"var(--r)",background:"var(--bg2)",border:"1px solid var(--border)"}}>
-                  <div style={{width:"32px",height:"32px",borderRadius:"9px",background:meta.bg,
-                    border:`1px solid ${acc.color}44`,display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:"13px",fontWeight:"800",color:acc.color,flexShrink:0}}>{meta.icon}</div>
-                  <div style={{flex:1,overflow:"hidden"}}>
-                    <div style={{fontSize:"12px",fontWeight:"600",color:"var(--text)"}}>{acc.label}</div>
-                    <div style={{fontSize:"11px",color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{acc.email}</div>
-                  </div>
-                  <span style={{fontSize:"11px",fontWeight:"600",color:"var(--green)",padding:"3px 10px",
-                    borderRadius:"100px",background:"rgba(78,203,164,0.12)",flexShrink:0}}>Connected</span>
-                </div>
-              );
-            })}
+            <div style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px 14px",
+              borderRadius:"var(--r)",background:"var(--bg2)",border:"1px solid var(--border)"}}>
+              <div style={{width:"32px",height:"32px",borderRadius:"9px",background:"rgba(234,67,53,0.12)",
+                border:"1px solid #EA433544",display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:"13px",fontWeight:"800",color:"#EA4335",flexShrink:0}}>G</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:"12px",fontWeight:"600",color:"var(--text)"}}>Gmail</div>
+                <div style={{fontSize:"11px",color:"var(--text3)"}}>{gmailAccount?gmailAccount.email:"Not connected"}</div>
+              </div>
+              <span style={{fontSize:"11px",fontWeight:"600",
+                color:gmailAccount?"var(--green)":"var(--text3)",
+                padding:"3px 10px",borderRadius:"100px",
+                background:gmailAccount?"rgba(78,203,164,0.12)":"var(--bg3)",flexShrink:0}}>
+                {gmailAccount?"Connected":"Disconnected"}
+              </span>
+            </div>
           </div>
         </section>
         <section>
@@ -1019,12 +943,6 @@ function OnboardingScreen({onComplete}){
 }
 
 // ── Main App ───────────────────────────────────────────────────────────────────
-const INIT_PROJECTS=[
-  {id:"p1",name:"CPHI Japan 2026",icon:"◈",color:"#A99CF0",desc:"Pharma exhibitor contacts",chats:8,created:"Jan 2026"},
-  {id:"p2",name:"Sage n Silk Launch",icon:"✦",color:"#C9A84C",desc:"Ayurvedic brand strategy",chats:5,created:"Feb 2026"},
-  {id:"p3",name:"DCAT Outreach",icon:"⊕",color:"#4ECBA4",desc:"Member company contacts",chats:12,created:"Mar 2026"},
-];
-
 export default function AuraApp(){
   const [authed,setAuthed]=useState(false);
   const [user,setUser]=useState({name:"Rama Reddy",role:"VP of Global Exports",company:"ALR Labs Pvt. Ltd.",email:"rama@alrlabs.com"});
@@ -1033,21 +951,45 @@ export default function AuraApp(){
   const [projects,setProjects]=useState(INIT_PROJECTS);
   const [activeProject,setActiveProject]=useState(null);
   const [showNewProject,setShowNewProject]=useState(false);
+  const [gmailAccount,setGmailAccount]=useState(null);
+
+  // Handle OAuth callback — reads token from URL params
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    if(params.get("gmail_connected")==="true"){
+      const token=params.get("access_token");
+      const email=params.get("email");
+      const name=params.get("name");
+      if(token&&email){
+        const account={token,email,name};
+        setGmailAccount(account);
+        gmailStorage.save(token,email,name||email);
+        setAuthed(true);
+        setScreen("email");
+      }
+      window.history.replaceState({},"",window.location.pathname);
+    } else {
+      const saved=gmailStorage.get();
+      if(saved)setGmailAccount(saved);
+    }
+  },[]);
 
   const handleOnboard=form=>{if(form.name)setUser({...user,...form});setAuthed(true);};
   const handleNav=id=>{if(id==="new_project"){setShowNewProject(true);}else{setScreen(id);}};
+  const handleGmailDisconnect=()=>{setGmailAccount(null);gmailStorage.clear();};
 
   if(!authed)return<OnboardingScreen onComplete={handleOnboard}/>;
 
   const screenMap={
     chat:<ChatScreen user={user} projects={projects} activeProject={activeProject}
-      onSelectProject={setActiveProject} onCreateProject={p=>setProjects(ps=>[...ps,p])} onNav={handleNav}/>,
-    email:<EmailScreen/>,
+      onSelectProject={setActiveProject} onNav={handleNav} gmailAccount={gmailAccount}/>,
+    email:<EmailScreen gmailAccount={gmailAccount} onNav={handleNav}/>,
     crm:<CRMScreen/>,
-    connectors:<ConnectorsScreen/>,
-    settings:<SettingsScreen user={user}/>,
-    calendar:<div style={{padding:"32px",color:"var(--text2)",fontSize:"14px"}}>📅 Calendar — Google Calendar MCP connected. Phase 2.</div>,
-    research:<div style={{padding:"32px",color:"var(--text2)",fontSize:"14px"}}>🔍 Research — Tavily API integration. Phase 2.</div>,
+    connectors:<ConnectorsScreen gmailAccount={gmailAccount}
+      onGmailConnect={setGmailAccount} onGmailDisconnect={handleGmailDisconnect}/>,
+    settings:<SettingsScreen user={user} gmailAccount={gmailAccount} onGmailDisconnect={handleGmailDisconnect}/>,
+    calendar:<div style={{padding:"32px",color:"var(--text2)",fontSize:"14px"}}>📅 Calendar — Phase 3.</div>,
+    research:<div style={{padding:"32px",color:"var(--text2)",fontSize:"14px"}}>🔍 Research — Phase 3.</div>,
   };
 
   return(
@@ -1057,7 +999,8 @@ export default function AuraApp(){
         onClose={()=>setShowNewProject(false)}/>}
       <Sidebar active={screen} onNav={handleNav} user={user}
         collapsed={sidebarCollapsed} onToggle={()=>setSidebarCollapsed(c=>!c)}
-        projects={projects} activeProject={activeProject} onSelectProject={setActiveProject}/>
+        projects={projects} activeProject={activeProject} onSelectProject={setActiveProject}
+        gmailConnected={!!gmailAccount}/>
       <main style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",position:"relative"}}>
         {screenMap[screen]||screenMap.chat}
       </main>
