@@ -379,7 +379,7 @@ function EmailScreen({gmailAccount,outlookAccount,onNav}){
       const data=await res.json();
       if(data.messages)setEmails(data.messages);
       else setError(data.error||"Failed to load inbox");
-    }catch(){setError("Connection error");}
+    }catch(e){setError("Connection error");}
     setLoading(false);
   };
 
@@ -467,7 +467,7 @@ function CalendarScreen({gmailAccount}){
       const res=await fetch(`${API_URL}/api/calendar?action=${v}`,{headers:{Authorization:`Bearer ${gmailAccount.token}`,"x-refresh-token":gmailAccount.refreshToken||""}});
       const data=await res.json();
       if(data.events)setEvents(data.events);else setError(data.error||"Failed to load");
-    }catch(){setError("Connection error");}
+    }catch(e){setError("Connection error");}
     setLoading(false);
   };
 
